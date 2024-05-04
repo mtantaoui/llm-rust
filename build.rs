@@ -9,7 +9,10 @@ fn main() {
         .flag("-Xcompiler")
         .flag("-lcublas")
         .flag("-lcublasLt")
-        .files(&["cuda/matmul/mul.cpp", "cuda/matmul/matmul.cu"])
+        .files(&[
+            "cuda/matmul_forward/matmul_forward_ffi.cpp",
+            "cuda/matmul_forward/matmul_forward.cu",
+        ])
         .compile("matmul.out");
 
     println!("cargo:rustc-env=LD_LIBRARY_PATH=/usr/local/cuda-12.3/lib64");

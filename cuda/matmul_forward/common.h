@@ -48,8 +48,10 @@ void cublasCheck(cublasStatus_t status, const char *file, int line)
 static size_t cublaslt_workspace_size = 32 * 1024 * 1024;
 static void *cublaslt_workspace = NULL;
 static cublasComputeType_t cublas_compute_type;
+
 cublasHandle_t cublas_handle;
 cublasLtHandle_t cublaslt_handle;
+
 int cuda_arch_major = 0;
 int cuda_arch_minor = 0;
 int cuda_num_SMs = 0;        // for persistent threads where we want 1 threadblock per SM

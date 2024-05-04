@@ -1,5 +1,5 @@
 #include <iostream>
-#include "matmul.h"
+#include "matmul_forward.h"
 
 using namespace std;
 
