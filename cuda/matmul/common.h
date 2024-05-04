@@ -248,6 +248,7 @@ void validate_result(D *device_result, const T *cpu_reference, const char *name,
             }
         }
     }
+    printf("\n");
 
     // reset the result pointer, so we can chain multiple tests and don't miss trivial errors,
     // like the kernel not writing to part of the result.
