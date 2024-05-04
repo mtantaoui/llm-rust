@@ -20,10 +20,10 @@ extern "C" {
 }
 
 fn main() {
-    let B = 2;
-    let T = 2;
-    let C = 2;
-    let OC = 2;
+    let B = 16;
+    let T = 5;
+    let C = 9;
+    let OC = 15;
 
     let sqrt_block_size = 16;
 

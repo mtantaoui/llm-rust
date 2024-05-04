@@ -1,8 +1,39 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <cublas_v2.h>
+#include <cuda_runtime.h>
+#include <cublasLt.h>
 #include "common.h"
 
-#include <cuda_runtime.h>
-#include <cublas_v2.h>
+// ----------------------------------------------------------------------------
+// CPU code reference
 
+void matmul_forward_cpu(float *out,
+                        const float *inp, const float *weight, const float *bias,
+                        int B, int T, int C, int OC)
+{
+    // OC is short for "output channels"
+    // inp is (B,T,C), weight is (OC, C), bias is (OC)
+    // out will be (B,T,OC)
+    for (int b = 0; b < B; b++)
+    {
+        for (int t = 0; t < T; t++)
+        {
+            float *out_bt = out + b * T * OC + t * OC;
+            const float *inp_bt = inp + b * T * C + t * C;
+            for (int o = 0; o < OC; o++)
+            {
+                float val = (bias != NULL) ? bias[o] : 0.0f;
+                const float *wrow = weight + o * C;
+                for (int i = 0; i < C; i++)
+                {
+                    val += inp_bt[i] * wrow[i];
+                }
+                out_bt[o] = val;
+            }
+        }
+    }
+}
 // ----------------------------------------------------------------------------
 // GPU kernels
 
@@ -257,6 +288,10 @@ void matmul_forward(int kernel_num,
     cudaCheck(cudaMemcpy(d_bias, bias, OC * sizeof(float), cudaMemcpyHostToDevice));
 
     matmul_forward_dispatch(kernel_num, d_out, d_inp, d_weight, d_bias, B, T, C, OC, sqrt_block_size);
+
+    // first check the correctness of the kernel
+    matmul_forward_cpu(out, inp, weight, bias, B, T, C, OC);
+
     validate_result(d_out, out, "out", B * T * OC, 1e-1f);
 
     cudaCheck(cudaFree(d_out));

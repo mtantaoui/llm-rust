@@ -6,10 +6,11 @@ fn main() {
         .cpp(true)
         .flag("-cudart=shared")
         .flag("--use_fast_math")
+        .flag("-Xcompiler")
         .flag("-lcublas")
         .flag("-lcublasLt")
         .files(&["cuda/matmul/mul.cpp", "cuda/matmul/matmul.cu"])
-        .compile("dot.a");
+        .compile("matmul.out");
 
     println!("cargo:rustc-env=LD_LIBRARY_PATH=/usr/local/cuda-12.3/lib64");
 
