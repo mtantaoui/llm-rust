@@ -3,14 +3,14 @@ extern crate cc;
 fn main() {
     cc::Build::new()
         .cuda(true)
-        .cpp(true)
         .flag("-cudart=shared")
         .flag("--use_fast_math")
         .flag("-lcublas")
         .flag("-lcublasLt")
         .files(&[
-            "cuda/matmul_forward/matmul_forward_ffi.cpp",
+            "cuda/ffi.cpp",
             "cuda/matmul_forward/matmul_forward.cu",
+            "cuda/adamw/adamw.cu",
         ])
         .compile("kernels.out");
 

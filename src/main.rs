@@ -17,6 +17,8 @@ extern "C" {
         sqrt_block_size: c_int,
     );
 
+    fn adamw_cuda(kernel_num: c_int);
+
 }
 
 fn main() {
@@ -40,6 +42,8 @@ fn main() {
     bias = vec![4.0; OC];
 
     unsafe {
+        adamw_cuda(1);
+
         matmul_forward_cuda(
             1,
             out.as_mut_ptr(),
@@ -78,5 +82,4 @@ fn main() {
             sqrt_block_size,
         );
     };
-    // cuda();
 }

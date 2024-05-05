@@ -3,6 +3,11 @@
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 #include <cublasLt.h>
+#include "adamw/adamw.h"
+#include "matmul_forward/matmul_forward.h"
+
+#ifndef COMMON
+#define COMMON
 
 template <class T>
 __host__ __device__ T ceil_div(T dividend, T divisor)
@@ -14,7 +19,7 @@ __host__ __device__ T ceil_div(T dividend, T divisor)
 // checking utils
 
 // CUDA error checking
-void cuda_check(cudaError_t error, const char *file, int line)
+static void cuda_check(cudaError_t error, const char *file, int line)
 {
     if (error != cudaSuccess)
     {
@@ -26,7 +31,7 @@ void cuda_check(cudaError_t error, const char *file, int line)
 #define cudaCheck(err) (cuda_check(err, __FILE__, __LINE__))
 
 // cuBLAS error checking
-void cublasCheck(cublasStatus_t status, const char *file, int line)
+static void cublasCheck(cublasStatus_t status, const char *file, int line)
 {
     if (status != CUBLAS_STATUS_SUCCESS)
     {
@@ -49,86 +54,18 @@ static size_t cublaslt_workspace_size = 32 * 1024 * 1024;
 static void *cublaslt_workspace = NULL;
 static cublasComputeType_t cublas_compute_type;
 
-cublasHandle_t cublas_handle;
-cublasLtHandle_t cublaslt_handle;
+static cublasHandle_t cublas_handle;
+static cublasLtHandle_t cublaslt_handle;
 
-int cuda_arch_major = 0;
-int cuda_arch_minor = 0;
-int cuda_num_SMs = 0;        // for persistent threads where we want 1 threadblock per SM
-int cuda_threads_per_SM = 0; // needed to calculate how many blocks to launch to fill up the GPU
-
-// ----------------------------------------------------------------------------
-// Packed128 data structure, which forces the compiler to use 128-bit loads/stores
-// in GPUs that support (the LDG.128 and STS.128 instructions)
-// This is a bit similar to the use of float4 in the case of 32-bit floats, but
-// supports arbitrary precision.
-
-template <class ElementType>
-struct alignas(16) Packed128
-{
-    __device__ Packed128() = default;
-    __device__ explicit Packed128(int4 bits)
-    {
-        static_assert(sizeof(bits) == sizeof(payload), "Size mismatch.");
-        memcpy(&payload, &bits, sizeof(bits));
-    }
-
-    __device__ ElementType &operator[](int index)
-    {
-        return payload[index];
-    }
-    __device__ const ElementType &operator[](int index) const
-    {
-        return payload[index];
-    }
-    __device__ int4 get_bits() const
-    {
-        int4 bits;
-        static_assert(sizeof(bits) == sizeof(payload), "Size mismatch.");
-        memcpy(&bits, &payload, sizeof(bits));
-        return bits;
-    }
-    // e.g. sizeof(int4) is 16 (4 X 4 bytes), sizeof(bfloat16) = 2, so size = 8
-    // so in the case where ElementType = bfloat16, we store 8 elements in one Packed128
-    static constexpr const int size = sizeof(int4) / sizeof(ElementType);
-    ElementType payload[size];
-};
-
-// short-form typedef
-typedef Packed128<float> f128;
-
-// load a Packed128 from an aligned memory address
-template <class ElementType>
-__device__ Packed128<ElementType> load128(const ElementType *address)
-{
-    return Packed128<ElementType>{*reinterpret_cast<const int4 *>(address)};
-}
-
-// load a Packed128 from an aligned memory address with streaming cache hint
-template <class ElementType>
-__device__ Packed128<ElementType> load128cs(const ElementType *address)
-{
-    return Packed128<ElementType>{__ldcs(reinterpret_cast<const int4 *>(address))};
-}
-
-// store a Packed128 to an aligned memory address
-template <class ElementType>
-__device__ void store128(ElementType *target, Packed128<ElementType> value)
-{
-    *reinterpret_cast<int4 *>(target) = value.get_bits();
-}
-
-// store a Packed128 to an aligned memory address with streaming cache hint
-template <class ElementType>
-__device__ void store128cs(ElementType *target, Packed128<ElementType> value)
-{
-    __stcs(reinterpret_cast<int4 *>(target), value.get_bits());
-}
+static int cuda_arch_major = 0;
+static int cuda_arch_minor = 0;
+static int cuda_num_SMs = 0;        // for persistent threads where we want 1 threadblock per SM
+static int cuda_threads_per_SM = 0; // needed to calculate how many blocks to launch to fill up the GPU
 
 // ----------------------------------------------------------------------------
 // random utils
 
-float *make_random_float_01(size_t N)
+static float *make_random_float_01(size_t N)
 {
     float *arr = (float *)malloc(N * sizeof(float));
     for (size_t i = 0; i < N; i++)
@@ -138,7 +75,7 @@ float *make_random_float_01(size_t N)
     return arr;
 }
 
-float *make_random_float(size_t N)
+static float *make_random_float(size_t N)
 {
     float *arr = (float *)malloc(N * sizeof(float));
     for (size_t i = 0; i < N; i++)
@@ -148,7 +85,7 @@ float *make_random_float(size_t N)
     return arr;
 }
 
-int *make_random_int(size_t N, int V)
+static int *make_random_int(size_t N, int V)
 {
     int *arr = (int *)malloc(N * sizeof(int));
     for (size_t i = 0; i < N; i++)
@@ -158,14 +95,14 @@ int *make_random_int(size_t N, int V)
     return arr;
 }
 
-float *make_zeros_float(size_t N)
+static float *make_zeros_float(size_t N)
 {
     float *arr = (float *)malloc(N * sizeof(float));
     memset(arr, 0, N * sizeof(float)); // all zero
     return arr;
 }
 
-float *make_ones_float(size_t N)
+static float *make_ones_float(size_t N)
 {
     float *arr = (float *)malloc(N * sizeof(float));
     for (size_t i = 0; i < N; i++)
@@ -197,7 +134,7 @@ template <class TargetType>
     return status;
 }
 
-void setup_main()
+static void setup_main()
 {
     srand(0); // determinism
 
@@ -297,3 +234,5 @@ float benchmark_kernel(int repeats, Kernel kernel, KernelArgs &&...kernel_args)
 
     return elapsed_time / repeats;
 }
+
+#endif
