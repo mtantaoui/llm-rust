@@ -159,6 +159,14 @@ void adamw(int kernel_num, float *params_memory, const float *grads_memory,
            float learning_rate = 1e-3, float beta1 = 0.9, float beta2 = 0.999,
            float eps = 1e-8, float weight_decay = 0.0) {
 
+    // set up the device
+    int deviceIdx = 0;
+    cudaCheck(cudaSetDevice(deviceIdx));
+
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, deviceIdx);
+    printf("Device %d: %s\n", deviceIdx, deviceProp.name);
+
     // move to GPU
     float *d_params_memory;
     float *d_grads_memory;
