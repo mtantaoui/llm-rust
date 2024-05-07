@@ -287,7 +287,12 @@ void matmul_forward(int kernel_num, float *out, const float *inp,
     matmul_forward_dispatch(kernel_num, d_out, d_inp, d_weight, d_bias, B, T, C,
                             OC, sqrt_block_size);
 
-    // // first check the correctness of the kernel
+    cudaDeviceSynchronize();
+
+    cudaCheck(cudaMemcpy(out, d_out, B * T * C * sizeof(float),
+                         cudaMemcpyDeviceToHost));
+
+    // first check the correctness of the kernel
     // matmul_forward_cpu(out, inp, weight, bias, B, T, C, OC);
 
     // validate_result(d_out, out, "out", B * T * OC, 1e-1f);

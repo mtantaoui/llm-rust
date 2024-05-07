@@ -1,7 +1,36 @@
-use std::ffi::{c_float, c_int, c_long};
-
 use num::ToPrimitive;
 use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
+use std::ffi::{c_float, c_int, c_long};
+
+fn matmul_forward_cpu(
+    out: &mut [f32],
+    inp: &[f32],
+    weight: &[f32],
+    bias: &[f32],
+    B: usize,
+    T: usize,
+    C: usize,
+    OC: usize,
+) {
+    // OC is short for "output channels"
+    // inp is (B,T,C), weight is (OC, C), bias is (OC)
+    // out will be (B,T,OC)
+
+    for b in 0..B {
+        for t in 0..T {
+            let out_bt = b * T * OC + t * OC;
+            let inp_bt = b * T * C + t * C;
+            for o in 0..OC {
+                let mut val = if bias.len() > 0 { bias[o] } else { 0.0 };
+                let wrow = o * C;
+                for i in 0..C {
+                    val += inp[inp_bt + i] * weight[wrow + i];
+                }
+                out[out_bt + o] = val;
+            }
+        }
+    }
+}
 
 fn make_random_float(n: i64) -> Vec<f32> {
     // Initialize a random number generator
@@ -78,6 +107,20 @@ fn adamw_test() {
             beta2,
             eps,
             weight_decay,
+        );
+        adamw_cuda(
+            2,
+            params_memory.as_mut_ptr(),
+            grads_memory.as_mut_ptr(),
+            m_memory.as_mut_ptr(),
+            v_memory.as_mut_ptr(),
+            t,
+            num_parameters,
+            learning_rate,
+            beta1,
+            beta2,
+            eps,
+            weight_decay,
         )
     }
 }
@@ -92,7 +135,8 @@ fn matmul_forward_test() {
 
     let mut inp: Vec<f32> = vec![1.0; b * t * c];
 
-    let mut out: Vec<f32> = vec![2.0; b * t * oc];
+    let mut out: Vec<f32> = Vec::with_capacity(b * t * oc);
+    let mut out_cpu: Vec<f32> = vec![0.0; b * t * oc];
 
     let mut weight: Vec<f32> = vec![3.0; oc * c];
 
@@ -137,9 +181,15 @@ fn matmul_forward_test() {
             sqrt_block_size,
         );
     };
+
+    let out = unsafe { std::slice::from_raw_parts(out.as_mut_ptr(), b * t * oc) };
+    let out = out.to_vec();
+    println!("{:?}, {}", out[0], out.len());
+    matmul_forward_cpu(&mut out_cpu, &mut inp, &mut weight, &mut bias, b, t, c, oc);
+    // println!("{:?}", out_cpu[0]);
 }
 
 fn main() {
     adamw_test();
-    // matmul_forward_test();
+    matmul_forward_test();
 }
