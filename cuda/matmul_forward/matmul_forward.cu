@@ -243,7 +243,7 @@ void matmul_forward(int kernel_num, float *out, const float *inp,
 
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, deviceIdx);
-    printf("Device %d: %s\n", deviceIdx, deviceProp.name);
+    // printf("Device %d: %s\n", deviceIdx, deviceProp.name);
 
     // setup cuBLAS and cuBLASLt
     cublasCheck(cublasCreate(&cublas_handle));
@@ -252,7 +252,7 @@ void matmul_forward(int kernel_num, float *out, const float *inp,
     // TF32 precision is equivalent to
     // torch.set_float32_matmul_precision('high')
     int enable_tf32 = deviceProp.major >= 8 ? 1 : 0;
-    printf("enable_tf32: %d\n", enable_tf32);
+    // printf("enable_tf32: %d\n", enable_tf32);
 
     cublas_compute_type =
         enable_tf32 ? CUBLAS_COMPUTE_32F_FAST_TF32 : CUBLAS_COMPUTE_32F;
