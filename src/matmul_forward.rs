@@ -27,16 +27,10 @@ mod tests {
     use super::*;
     use test::Bencher;
 
-    // const B: usize = 8;
-    // const T: usize = 1024;
-    // const C: usize = 768;
-    // const OC: usize = 768 * 4;
-    // const SQRT_BLOCK_SIZE: usize = 16;
-
-    const B: usize = 10;
-    const T: usize = 10;
-    const C: usize = 10;
-    const OC: usize = 10;
+    const B: usize = 8;
+    const T: usize = 1024;
+    const C: usize = 768;
+    const OC: usize = 768;
     const SQRT_BLOCK_SIZE: usize = 16;
 
     fn matmul_forward_cpu(out: &mut [f32], inp: &[f32], weight: &[f32], bias: &[f32]) {
@@ -85,12 +79,14 @@ mod tests {
             );
         };
         // getting result from cuda
-        let out = unsafe { std::slice::from_raw_parts(out.as_mut_ptr(), B * T * OC) };
+        let out_gpu = unsafe { std::slice::from_raw_parts(out.as_mut_ptr(), B * T * OC) };
 
         // computing result on cpu for comparison
         let mut out_cpu: Vec<f32> = vec![0.0; B * T * OC];
         matmul_forward_cpu(&mut out_cpu, &mut inp, &mut weight, &mut bias);
-        assert_eq!(out_cpu.to_vec(), out.to_vec());
+
+        assert_eq!(out_cpu.len(), out_gpu.to_vec().len());
+        assert_eq!(out_cpu, out_gpu.to_vec());
     }
 
     #[bench]
